@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+.pytest_cache/
+.streamlit/secrets.toml
+cloudflared.exe
+scratch/
+.claude/
+.agents/
+*.lnk
+0
