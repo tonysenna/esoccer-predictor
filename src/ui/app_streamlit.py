@@ -89,7 +89,25 @@ with SessionLocal() as db:
     # Obtener lista completa de gamers (DB + Participantes oficiales de Esports Battle)
     all_players = db.query(Player).order_by(Player.display_name).all()
     player_map_id = {p.id: p.display_name for p in all_players}
-    cached_participants = esports_scraper.get_all_participants()
+    
+    cached_participants = []
+    if hasattr(esports_scraper, "get_all_participants"):
+        try:
+            cached_participants = esports_scraper.get_all_participants()
+        except Exception:
+            cached_participants = []
+    else:
+        try:
+            import json
+            from pathlib import Path
+            p_file = Path(__file__).resolve().parent.parent.parent / "data" / "esportsbattle_players.json"
+            if p_file.exists():
+                with open(p_file, "r", encoding="utf-8") as f:
+                    p_data = json.load(f)
+                    cached_participants = [p["nickname"].strip() for p in p_data if "nickname" in p]
+        except Exception:
+            cached_participants = []
+
     all_names_set = set([p.display_name for p in all_players] + cached_participants)
     player_names = sorted(list(all_names_set)) if all_names_set else ["Dicca", "Jankulovski", "Lio", "Danny", "Kravich", "Niko", "Calvin"]
 
