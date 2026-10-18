@@ -64,6 +64,16 @@ selected_tab = st.sidebar.radio(
 # Inicializar DB si no existe
 init_db()
 
+@st.cache_resource(ttl=1800)
+def get_cached_dc_model(duration_format_value: str) -> DixonColesModel:
+    """Mantiene el modelo Dixon-Coles entrenado en memoria RAM para 0% uso de CPU y respuesta instantánea."""
+    fmt = DurationFormat(duration_format_value)
+    with SessionLocal() as db_session:
+        matches = get_all_matches_for_format(db_session, fmt)
+        m = DixonColesModel(duration_format=fmt, decay_xi=settings.TIME_DECAY_XI, window_size=200, retrain_batch_size=10, shrinkage_m=5.0)
+        m.fit(matches)
+        return m
+
 with SessionLocal() as db:
     # Cargar lista de equipos oficiales de Esports Battle y EA Sports FC
     from src.ingestion.esportsbattle_scraper import EsportsBattleScraper, get_team_tier_modifier
@@ -139,7 +149,7 @@ with SessionLocal() as db:
                     st.rerun()
 
         st.markdown("---")
-        upcoming = get_upcoming_matches(db, limit=100)
+        upcoming = get_upcoming_matches(db, limit=35)
 
         if not upcoming:
             st.info("ℹ️ No hay partidos programados pendientes en la base de datos en este momento.")
@@ -174,13 +184,11 @@ with SessionLocal() as db:
                 radar_rows = []
                 elo_engine = DynamicEloEngine(settings.BASE_ELO_RATING, k_factor=settings.ELO_K_FACTOR, inactivity_c=51.12)
                 
-                # Pre-entrenar modelos por formato
-                models = {}
-                for fmt in [DurationFormat.MIN_8, DurationFormat.MIN_10, DurationFormat.MIN_12]:
-                    t_matches = get_all_matches_for_format(db, fmt)
-                    m = DixonColesModel(duration_format=fmt, decay_xi=settings.TIME_DECAY_XI, window_size=200, retrain_batch_size=10, shrinkage_m=5.0)
-                    m.fit(t_matches)
-                    models[fmt] = m
+                # Modelos cacheados ultra-rápidos por formato (0% CPU)
+                models = {
+                    fmt: get_cached_dc_model(fmt.value)
+                    for fmt in [DurationFormat.MIN_8, DurationFormat.MIN_10, DurationFormat.MIN_12]
+                }
 
                 total_value_found = 0
                 for match in upcoming:
@@ -434,16 +442,8 @@ with SessionLocal() as db:
             h2h_matches = get_h2h_matches(db, p_a.id, p_b.id, duration_format=duration_fmt, limit=50)
             h2h = calculate_h2h_metrics(p_a.id, p_b.id, h2h_matches, duration_fmt)
 
-            # 3. Ajuste Dixon-Coles Bivariado
-            training_matches = get_all_matches_for_format(db, duration_fmt)
-            dc_model = DixonColesModel(
-                duration_format=duration_fmt,
-                decay_xi=settings.TIME_DECAY_XI,
-                window_size=200,
-                retrain_batch_size=10,
-                shrinkage_m=5.0,
-            )
-            dc_model.fit(training_matches)
+            # 3. Modelo Dixon-Coles Bivariado (Caché ultrarrápida en memoria - 0% CPU)
+            dc_model = get_cached_dc_model(duration_fmt.value)
 
             # 4. Predicción con Shrinkage Bayesiano y ajuste de Tier de Club
             pred = dc_model.predict_match(
