@@ -86,10 +86,12 @@ with SessionLocal() as db:
         except Exception:
             pass
 
-    # Obtener lista de gamers registrados
+    # Obtener lista completa de gamers (DB + Participantes oficiales de Esports Battle)
     all_players = db.query(Player).order_by(Player.display_name).all()
     player_map_id = {p.id: p.display_name for p in all_players}
-    player_names = [p.display_name for p in all_players] if all_players else ["Lio", "Danny", "Kravich", "Niko", "Calvin"]
+    cached_participants = esports_scraper.get_all_participants()
+    all_names_set = set([p.display_name for p in all_players] + cached_participants)
+    player_names = sorted(list(all_names_set)) if all_names_set else ["Dicca", "Jankulovski", "Lio", "Danny", "Kravich", "Niko", "Calvin"]
 
     # -------------------------------------------------------------
     # TAB 1: RADAR +EV (ESCÁNER AUTOMÁTICO DE PARTIDOS DE HOY)
@@ -271,7 +273,7 @@ with SessionLocal() as db:
         
         selection_mode = st.radio(
             "Modo de Selección del Partido",
-            ["📅 Elegir de la Cartelera de Hoy (Automático)", "⚡ Escribir Partido de Bet365 / Directo", "✍️ Selección de Lista Registrada"],
+            ["📅 Elegir de la Cartelera de Hoy (Automático)", "🎯 Selección Manual (Elegir Gamers y Equipos)"],
             horizontal=True
         )
 
@@ -318,51 +320,29 @@ with SessionLocal() as db:
 
                 st.info(f"⚽ Partido Cargado: **{team_a} ({gamer_a})** vs **{team_b} ({gamer_b})** | Formato: **{duration_fmt.value}**")
             else:
-                st.warning("No hay partidos en la cartelera de hoy. Cambia a 'Escribir Partido' o ve al 'Radar +EV' para sincronizar con Esports Battle.")
+                st.warning("No hay partidos en la cartelera de hoy. Cambia a 'Selección Manual' o ve al 'Radar +EV' para sincronizar con Esports Battle.")
                 gamer_a = "Dicca"
                 gamer_b = "Jankulovski"
                 team_a = "Napoli"
                 team_b = "Sassuolo"
                 duration_fmt = DurationFormat.MIN_8
-        elif selection_mode == "⚡ Escribir Partido de Bet365 / Directo":
-            c_p1, c_p2, c_fmt = st.columns(3)
-            with c_p1:
-                st.markdown("##### 🔵 Lado Local")
-                gamer_a = st.text_input("Gamer Local (ej: Dicca, Mers, A1ose)", value="Dicca").strip()
-                def_a = official_teams.index("Napoli") if "Napoli" in official_teams else 0
-                team_a = st.selectbox("Equipo Local (Club EA Sports FC)", official_teams, index=def_a, key="team_a_manual")
-            with c_p2:
-                st.markdown("##### 🔴 Lado Visitante")
-                gamer_b = st.text_input("Gamer Visitante (ej: Jankulovski, Legion)", value="Jankulovski").strip()
-                def_b = official_teams.index("Sassuolo") if "Sassuolo" in official_teams else (1 if len(official_teams) > 1 else 0)
-                team_b = st.selectbox("Equipo Visitante (Club EA Sports FC)", official_teams, index=def_b, key="team_b_manual")
-            with c_fmt:
-                st.markdown("##### ⏱️ Formato de Duración")
-                fmt_choice = st.selectbox("Formato", ["4x2 (8 min - Esports Battle)", "5x2 (10 min - GT Leagues)", "6x2 (12 min - GT Leagues)"], index=0)
-
-            fmt_map = {
-                "4x2 (8 min - Esports Battle)": DurationFormat.MIN_8,
-                "5x2 (10 min - GT Leagues)": DurationFormat.MIN_10,
-                "6x2 (12 min - GT Leagues)": DurationFormat.MIN_12,
-            }
-            duration_fmt = fmt_map[fmt_choice]
-            st.caption(f"⚡ Analizando enfrentamiento directo: **{team_a} ({gamer_a})** vs **{team_b} ({gamer_b})** en formato **{duration_fmt.value}**.")
         else:
             c_p1, c_p2, c_fmt = st.columns(3)
             with c_p1:
                 st.markdown("##### 🔵 Lado Local")
-                gamer_a = st.selectbox("Gamer Local (A)", player_names, index=0 if len(player_names) > 0 else 0)
-                def_a = official_teams.index("Real Madrid") if "Real Madrid" in official_teams else 0
-                team_a = st.selectbox("Equipo Local (Club EA Sports FC)", official_teams, index=def_a, key="team_a_reg")
+                def_ga = player_names.index("Dicca") if "Dicca" in player_names else (player_names.index("Lio") if "Lio" in player_names else 0)
+                gamer_a = st.selectbox("Gamer Local (Desplegable / Escribe letra)", player_names, index=def_ga, key="gamer_a_manual_sel")
+                def_ta = official_teams.index("Napoli") if "Napoli" in official_teams else 0
+                team_a = st.selectbox("Equipo Local (Club EA Sports FC)", official_teams, index=def_ta, key="team_a_manual_sel")
             with c_p2:
                 st.markdown("##### 🔴 Lado Visitante")
-                default_b_idx = 1 if len(player_names) > 1 else 0
-                gamer_b = st.selectbox("Gamer Visitante (B)", player_names, index=default_b_idx)
-                def_b = official_teams.index("Barcelona") if "Barcelona" in official_teams else (1 if len(official_teams) > 1 else 0)
-                team_b = st.selectbox("Equipo Visitante (Club EA Sports FC)", official_teams, index=def_b, key="team_b_reg")
+                def_gb = player_names.index("Jankulovski") if "Jankulovski" in player_names else (player_names.index("Danny") if "Danny" in player_names else (1 if len(player_names) > 1 else 0))
+                gamer_b = st.selectbox("Gamer Visitante (Desplegable / Escribe letra)", player_names, index=def_gb, key="gamer_b_manual_sel")
+                def_tb = official_teams.index("Sassuolo") if "Sassuolo" in official_teams else (1 if len(official_teams) > 1 else 0)
+                team_b = st.selectbox("Equipo Visitante (Club EA Sports FC)", official_teams, index=def_tb, key="team_b_manual_sel")
             with c_fmt:
                 st.markdown("##### ⏱️ Formato de Duración")
-                fmt_choice = st.selectbox("Formato de Duración", ["4x2 (8 min - Esports Battle)", "5x2 (10 min - GT Leagues)", "6x2 (12 min - GT Leagues)"])
+                fmt_choice = st.selectbox("Formato", ["4x2 (8 min - Esports Battle)", "5x2 (10 min - GT Leagues)", "6x2 (12 min - GT Leagues)"], index=0, key="fmt_choice_manual")
 
             fmt_map = {
                 "4x2 (8 min - Esports Battle)": DurationFormat.MIN_8,
@@ -370,6 +350,20 @@ with SessionLocal() as db:
                 "6x2 (12 min - GT Leagues)": DurationFormat.MIN_12,
             }
             duration_fmt = fmt_map[fmt_choice]
+
+            # Opción para escribir a mano si el gamer no estuviera registrado
+            with st.expander("✏️ ¿Un gamer no aparece en el desplegable? Escríbelo a mano", expanded=False):
+                col_custom1, col_custom2 = st.columns(2)
+                with col_custom1:
+                    custom_a = st.text_input("Gamer Local Personalizado", value="", key="custom_g_a").strip()
+                with col_custom2:
+                    custom_b = st.text_input("Gamer Visitante Personalizado", value="", key="custom_g_b").strip()
+                if custom_a:
+                    gamer_a = custom_a
+                if custom_b:
+                    gamer_b = custom_b
+
+            st.caption(f"⚡ Enfrentamiento configurado: **{team_a} ({gamer_a})** vs **{team_b} ({gamer_b})** en formato **{duration_fmt.value}**.")
 
         st.markdown("---")
         st.subheader("⚖️ Comparativa de Cuotas: Bet365 vs Betfair (Mejor Cuota & Arbitraje)")
@@ -929,12 +923,14 @@ with SessionLocal() as db:
                 st.markdown("##### 🔵 Local")
                 add_def_a = official_teams.index("Napoli") if "Napoli" in official_teams else 0
                 add_team_home = st.selectbox("Equipo Local (Club EA Sports FC)", official_teams, index=add_def_a, key="add_t_h")
-                add_gamer_home = st.text_input("Gamer Local", "Dicca", key="add_g_h")
+                add_def_ga = player_names.index("Dicca") if "Dicca" in player_names else 0
+                add_gamer_home = st.selectbox("Gamer Local", player_names, index=add_def_ga, key="add_g_h")
             with b_c2:
                 st.markdown("##### 🔴 Visitante")
                 add_def_b = official_teams.index("Sassuolo") if "Sassuolo" in official_teams else (1 if len(official_teams) > 1 else 0)
                 add_team_away = st.selectbox("Equipo Visitante (Club EA Sports FC)", official_teams, index=add_def_b, key="add_t_a")
-                add_gamer_away = st.text_input("Gamer Visitante", "Jankulovski", key="add_g_a")
+                add_def_gb = player_names.index("Jankulovski") if "Jankulovski" in player_names else (1 if len(player_names) > 1 else 0)
+                add_gamer_away = st.selectbox("Gamer Visitante", player_names, index=add_def_gb, key="add_g_a")
             with b_c3:
                 st.markdown("##### ⏱️ Formato de Duración")
                 new_fmt = st.selectbox("Formato", ["4x2 (8 min - Esports Battle)", "5x2 (10 min - GT Leagues)", "6x2 (12 min - GT Leagues)"])

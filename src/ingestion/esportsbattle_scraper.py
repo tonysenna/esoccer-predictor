@@ -149,14 +149,6 @@ class EsportsBattleScraper:
                 total_lose = int(p_info.get("totalLose") or 0)
                 total_draw = int(p_info.get("totalDraw") or 0)
 
-                # Si no vinieron los desgloses en la lista, consultar el perfil individual
-                if total_matches > 0 and total_win == 0 and total_lose == 0:
-                    detail = self._get(f"/api/participants/{nickname}")
-                    if detail:
-                        total_win = int(detail.get("totalWin") or 0)
-                        total_lose = int(detail.get("totalLose") or 0)
-                        total_draw = int(detail.get("totalDraw") or 0)
-
                 win_rate = (total_win / total_matches) if total_matches > 0 else 0.0
 
                 # Actualizar o crear en base de datos
@@ -206,6 +198,21 @@ class EsportsBattleScraper:
 
         logger.info(f"Sincronizados {synced_count} jugadores con sus estadísticas reales.")
         return synced_count
+
+    def get_all_participants(self) -> list[str]:
+        """
+        Retorna la lista completa de nicknames de participantes (desde caché o DB).
+        """
+        if PLAYERS_CACHE_FILE.exists():
+            try:
+                with open(PLAYERS_CACHE_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    names = [p["nickname"].strip() for p in data if "nickname" in p]
+                    if names:
+                        return sorted(list(set(names)))
+            except Exception:
+                pass
+        return []
 
     def sync_upcoming_matches(self) -> list[dict[str, Any]]:
         """
