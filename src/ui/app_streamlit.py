@@ -30,6 +30,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Evitar que el traductor automático de Google Chrome rompa el árbol DOM de React/Streamlit
+st.markdown(
+    """
+    <meta name="google" content="notranslate">
+    <style>
+    body, html, [data-testid="stAppViewContainer"] {
+        translate: no !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 settings = get_settings()
 
 st.title("⚽ e-Soccer Predictive Engine & Value Bet Analyzer")
