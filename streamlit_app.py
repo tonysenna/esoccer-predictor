@@ -1,3 +1,4 @@
+# e-Soccer Predictor & Value Bet Engine - v1.2 (Gamers & Teams Selectbox)
 import os
 import sys
 
