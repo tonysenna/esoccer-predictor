@@ -1,10 +1,14 @@
 from functools import lru_cache
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_DB_PATH = (BASE_DIR / "esports_bot.db").as_posix()
 
 
 class Settings(BaseSettings):
     # Base de Datos
-    DATABASE_URL: str = "sqlite:///esports_bot.db"
+    DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_PATH}"
 
     # Ingesta y API Keys
     BETSAPI_KEY: str | None = None
