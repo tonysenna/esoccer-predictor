@@ -9,10 +9,5 @@ if ROOT_DIR not in sys.path:
 
 import runpy
 
-# Limpiar cache de módulos internos 'src.*' para forzar la recarga del código actualizado
-for mod in list(sys.modules.keys()):
-    if mod.startswith("src."):
-        del sys.modules[mod]
-
 app_path = os.path.join(ROOT_DIR, "src", "ui", "app_streamlit.py")
 runpy.run_path(app_path, run_name="__main__")
