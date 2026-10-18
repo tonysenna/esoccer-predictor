@@ -27,7 +27,8 @@ HEADERS = {
     "Referer": "https://football.esportsbattle.com/",
 }
 
-DATA_DIR = Path("data")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_DIR = BASE_DIR / "data"
 TEAMS_CACHE_FILE = DATA_DIR / "esportsbattle_teams.json"
 PLAYERS_CACHE_FILE = DATA_DIR / "esportsbattle_players.json"
 
